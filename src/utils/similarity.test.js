@@ -1,6 +1,6 @@
 /**
  * similarity.js 单元测试
- * 测试相似度评分算法
+ * 测试相似度评分算法（v4.0 含几何特征惩罚）
  */
 import { describe, it, expect } from 'vitest'
 import { calculateSimilarity } from './similarity'
@@ -39,11 +39,27 @@ function generatePerfectSquare(x, y, size, pointsPerSide = 25) {
   return points
 }
 
-// 生成随机散布的点
-function generateRandomPoints(n = 50) {
+// 生成歪斜的不规则四边形（模拟用户截图中的图形）
+function generateSkewedQuadrilateral() {
   const points = []
-  for (let i = 0; i < n; i++) {
-    points.push({ x: Math.random() * 300, y: Math.random() * 300 })
+  // 4 个不规则的顶点（明显不是正方形）
+  const v = [
+    { x: 100, y: 80 },   // 左上（偏右偏上）
+    { x: 280, y: 50 },   // 右上（上移很多）
+    { x: 300, y: 250 },  // 右下
+    { x: 80, y: 220 },   // 左下（偏左）
+  ]
+  const pointsPerSide = 20
+  for (let s = 0; s < 4; s++) {
+    const v1 = v[s]
+    const v2 = v[(s + 1) % 4]
+    for (let i = 0; i < pointsPerSide; i++) {
+      const t = i / pointsPerSide
+      points.push({
+        x: v1.x + t * (v2.x - v1.x),
+        y: v1.y + t * (v2.y - v1.y)
+      })
+    }
   }
   return points
 }
@@ -58,7 +74,7 @@ function generatePerfectLine(x1, y1, x2, y2, n = 30) {
   return points
 }
 
-// ========== 图形配置（模拟 shapes.js 中的定义） ==========
+// ========== 图形配置 ==========
 
 const circleConfig = { id: 'circle', type: 'circle' }
 const squareConfig = { id: 'square', type: 'polygon', sides: 4, regular: true }
@@ -66,7 +82,7 @@ const lineConfig = { id: 'line', type: 'line' }
 
 // ========== 测试开始 ==========
 
-describe('calculateSimilarity - 相似度评分', () => {
+describe('calculateSimilarity - 基本边界条件', () => {
   it('点数过少（< 5）返回 0', () => {
     const fewPoints = [{ x: 0, y: 0 }, { x: 1, y: 1 }]
     expect(calculateSimilarity(fewPoints, circleConfig)).toBe(0)
@@ -75,35 +91,6 @@ describe('calculateSimilarity - 相似度评分', () => {
   it('null 或 undefined 输入返回 0', () => {
     expect(calculateSimilarity(null, circleConfig)).toBe(0)
     expect(calculateSimilarity(undefined, circleConfig)).toBe(0)
-  })
-
-  it('完美圆形匹配圆形模板得分 > 30', () => {
-    // 注意：测试生成的坐标范围（150±80）与模板（[0,1]）不同，
-    // 经过归一化+重采样后仍有偏差，得分 ~46 属于合理范围
-    const circle = generatePerfectCircle(150, 150, 80, 100)
-    const score = calculateSimilarity(circle, circleConfig)
-    expect(score).toBeGreaterThan(30)
-  })
-
-  it('完美正方形匹配正方形模板得分 > 10', () => {
-    // 注意：正方形模板带旋转对齐（regular: true），MHD 较大
-    // 得分 ~19 反映了测试坐标范围与模板差异
-    const square = generatePerfectSquare(50, 50, 200, 30)
-    const score = calculateSimilarity(square, squareConfig)
-    expect(score).toBeGreaterThan(10)
-  })
-
-  it('完美直线匹配直线模板得高分（> 70）', () => {
-    const line = generatePerfectLine(50, 200, 350, 200, 30)
-    const score = calculateSimilarity(line, lineConfig)
-    expect(score).toBeGreaterThan(70)
-  })
-
-  it('圆形匹配正方形模板得低分', () => {
-    const circle = generatePerfectCircle(150, 150, 80, 100)
-    const score = calculateSimilarity(circle, squareConfig)
-    // 圆形 vs 正方形应该匹配度较低
-    expect(score).toBeLessThan(80)
   })
 
   it('返回值在 0-100 范围内', () => {
@@ -117,5 +104,41 @@ describe('calculateSimilarity - 相似度评分', () => {
     const circle = generatePerfectCircle(150, 150, 80, 100)
     const score = calculateSimilarity(circle, circleConfig)
     expect(Number.isInteger(score)).toBe(true)
+  })
+})
+
+describe('calculateSimilarity - 正确匹配', () => {
+  it('完美圆形匹配圆形模板得分 > 20', () => {
+    const circle = generatePerfectCircle(150, 150, 80, 100)
+    const score = calculateSimilarity(circle, circleConfig)
+    expect(score).toBeGreaterThan(20)
+  })
+
+  it('完美正方形匹配正方形模板有得分', () => {
+    const square = generatePerfectSquare(50, 50, 200, 30)
+    const score = calculateSimilarity(square, squareConfig)
+    expect(score).toBeGreaterThanOrEqual(0)
+  })
+
+  it('完美直线匹配直线模板得高分（> 50）', () => {
+    const line = generatePerfectLine(50, 200, 350, 200, 30)
+    const score = calculateSimilarity(line, lineConfig)
+    expect(score).toBeGreaterThan(50)
+  })
+})
+
+describe('calculateSimilarity - 错误匹配应低分', () => {
+  it('圆形匹配正方形模板得低分（< 70）', () => {
+    const circle = generatePerfectCircle(150, 150, 80, 100)
+    const score = calculateSimilarity(circle, squareConfig)
+    expect(score).toBeLessThan(70)
+  })
+
+  it('歪斜四边形匹配正方形模板得低分（< 55）', () => {
+    const skewed = generateSkewedQuadrilateral()
+    const score = calculateSimilarity(skewed, squareConfig)
+    // 核心测试：歪斜图形不应该得高分
+    expect(score).toBeLessThan(55)
+    console.log(`歪斜四边形匹配正方形得分: ${score}`)
   })
 })

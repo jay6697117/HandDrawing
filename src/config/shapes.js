@@ -5,8 +5,8 @@
 
 // ========== 章节配置 ==========
 export const chapters = [
-  { id: 1, name: '基础圆与方', color: '#FF6B6B', passThreshold: 55 },
-  { id: 2, name: '三角家族', color: '#4ECDC4', passThreshold: 50 },
+  { id: 1, name: '基础圆与方', color: '#FF6B6B', passThreshold: 50 },
+  { id: 2, name: '三角家族', color: '#4ECDC4', passThreshold: 45 },
   { id: 3, name: '四边形进阶', color: '#A78BFA', passThreshold: 48 },
   { id: 4, name: '多边形挑战', color: '#FFD93D', passThreshold: 45 },
   { id: 5, name: '星形与箭头', color: '#F093FB', passThreshold: 42 },
