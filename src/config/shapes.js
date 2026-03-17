@@ -819,3 +819,734 @@ export function getShapesByChapter(chapterId) {
 export function getChapter(chapterId) {
   return chapters.find(c => c.id === chapterId)
 }
+
+// ========== 模板点集生成系统（用于 Hausdorff 距离算法） ==========
+
+// 缓存已生成的模板点集
+const templateCache = {}
+
+/**
+ * 获取图形的标准模板点集（带缓存）
+ * 点集归一化到 [0, 1] 范围，均匀采样 96 个点
+ * @param {string} shapeId - 图形 ID
+ * @returns {Array} 归一化的模板点集 [{x, y}, ...]
+ */
+export function getTemplatePoints(shapeId) {
+  if (templateCache[shapeId]) return templateCache[shapeId]
+
+  const config = getShapeById(shapeId)
+  if (!config) return null
+
+  const points = generateTemplatePoints(config)
+  templateCache[shapeId] = points
+  return points
+}
+
+/**
+ * 根据图形配置生成标准模板点集
+ * 所有点归一化到 [0, 1] 坐标系
+ */
+function generateTemplatePoints(config) {
+  const N = 96 // 采样点数
+
+  switch (config.type) {
+    case 'circle':
+      return generateCirclePoints(N)
+    case 'ellipse':
+      return generateEllipsePoints(N)
+    case 'line':
+      return generateLinePoints(N)
+    case 'polygon':
+      return generatePolygonPoints(config, N)
+    case 'star':
+      return generateStarPoints(config, N)
+    case 'arrow':
+      return generateArrowPoints(config, N)
+    case 'curve':
+      return generateCurvePoints(config, N)
+    case 'symbol':
+      return generateSymbolPoints(config, N)
+    case 'composite':
+      return generateCompositePoints(config, N)
+    default:
+      return generateCirclePoints(N)
+  }
+}
+
+/**
+ * 圆形：96 个均匀分布在圆上的点
+ */
+function generateCirclePoints(n) {
+  const cx = 0.5, cy = 0.5, r = 0.4
+  const points = []
+  for (let i = 0; i < n; i++) {
+    const angle = (i * 2 * Math.PI) / n
+    points.push({
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle)
+    })
+  }
+  return points
+}
+
+/**
+ * 椭圆：96 个均匀分布在椭圆上的点
+ */
+function generateEllipsePoints(n) {
+  const cx = 0.5, cy = 0.5, rx = 0.4, ry = 0.25
+  const points = []
+  for (let i = 0; i < n; i++) {
+    const angle = (i * 2 * Math.PI) / n
+    points.push({
+      x: cx + rx * Math.cos(angle),
+      y: cy + ry * Math.sin(angle)
+    })
+  }
+  return points
+}
+
+/**
+ * 直线：96 个均匀分布在线段上的点
+ */
+function generateLinePoints(n) {
+  const points = []
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1)
+    points.push({
+      x: 0.15 + t * 0.7,
+      y: 0.5
+    })
+  }
+  return points
+}
+
+/**
+ * 多边形：沿各边均匀采样
+ */
+function generatePolygonPoints(config, n) {
+  const vertices = getPolygonVertices(config)
+  return sampleAlongEdges(vertices, n, true)
+}
+
+/**
+ * 获取多边形顶点坐标（归一化）
+ */
+function getPolygonVertices(config) {
+  const id = config.id
+  // 正多边形
+  if (config.regular) {
+    return generateRegularPolygonVertices(config.sides)
+  }
+  // 特殊四边形
+  switch (id) {
+    case 'rectangle':
+      return [
+        { x: 0.15, y: 0.275 }, { x: 0.85, y: 0.275 },
+        { x: 0.85, y: 0.725 }, { x: 0.15, y: 0.725 }
+      ]
+    case 'diamond':
+      return [
+        { x: 0.5, y: 0.1 }, { x: 0.85, y: 0.5 },
+        { x: 0.5, y: 0.9 }, { x: 0.15, y: 0.5 }
+      ]
+    case 'trapezoid':
+      return [
+        { x: 0.3, y: 0.25 }, { x: 0.7, y: 0.25 },
+        { x: 0.85, y: 0.75 }, { x: 0.15, y: 0.75 }
+      ]
+    case 'parallelogram':
+      return [
+        { x: 0.25, y: 0.25 }, { x: 0.85, y: 0.25 },
+        { x: 0.75, y: 0.75 }, { x: 0.15, y: 0.75 }
+      ]
+    case 'right-trapezoid':
+      return [
+        { x: 0.2, y: 0.25 }, { x: 0.7, y: 0.25 },
+        { x: 0.8, y: 0.75 }, { x: 0.2, y: 0.75 }
+      ]
+    case 'kite':
+      return [
+        { x: 0.5, y: 0.08 }, { x: 0.78, y: 0.38 },
+        { x: 0.5, y: 0.92 }, { x: 0.22, y: 0.38 }
+      ]
+    case 'right-triangle':
+      return [
+        { x: 0.15, y: 0.85 }, { x: 0.85, y: 0.85 }, { x: 0.15, y: 0.15 }
+      ]
+    case 'isosceles-triangle':
+      return [
+        { x: 0.5, y: 0.12 }, { x: 0.82, y: 0.85 }, { x: 0.18, y: 0.85 }
+      ]
+    case 'obtuse-triangle':
+      return [
+        { x: 0.1, y: 0.8 }, { x: 0.9, y: 0.8 }, { x: 0.3, y: 0.2 }
+      ]
+    case 'acute-triangle':
+      return [
+        { x: 0.5, y: 0.1 }, { x: 0.85, y: 0.85 }, { x: 0.15, y: 0.85 }
+      ]
+    default:
+      return generateRegularPolygonVertices(config.sides || 4)
+  }
+}
+
+/**
+ * 生成正多边形顶点
+ */
+function generateRegularPolygonVertices(sides) {
+  const cx = 0.5, cy = 0.5, r = 0.38
+  const vertices = []
+  for (let i = 0; i < sides; i++) {
+    const angle = (i * 2 * Math.PI) / sides - Math.PI / 2
+    vertices.push({
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle)
+    })
+  }
+  return vertices
+}
+
+/**
+ * 星形：顶点交替分布在内外半径上
+ */
+function generateStarPoints(config, n) {
+  const numPoints = config.points || 5
+  const cx = 0.5, cy = 0.5
+  const outerR = 0.38, innerR = outerR * 0.4
+  const vertices = []
+  for (let i = 0; i < numPoints * 2; i++) {
+    const angle = (i * Math.PI) / numPoints - Math.PI / 2
+    const r = i % 2 === 0 ? outerR : innerR
+    vertices.push({
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle)
+    })
+  }
+  return sampleAlongEdges(vertices, n, true)
+}
+
+/**
+ * 箭头：根据具体箭头类型生成顶点
+ */
+function generateArrowPoints(config, n) {
+  let vertices
+  switch (config.id) {
+    case 'arrow-right':
+      vertices = [
+        { x: 0.15, y: 0.4 }, { x: 0.55, y: 0.4 }, { x: 0.55, y: 0.2 },
+        { x: 0.85, y: 0.5 },
+        { x: 0.55, y: 0.8 }, { x: 0.55, y: 0.6 }, { x: 0.15, y: 0.6 }
+      ]
+      break
+    case 'arrow-up':
+      vertices = [
+        { x: 0.5, y: 0.15 }, { x: 0.8, y: 0.45 }, { x: 0.6, y: 0.45 },
+        { x: 0.6, y: 0.85 }, { x: 0.4, y: 0.85 }, { x: 0.4, y: 0.45 },
+        { x: 0.2, y: 0.45 }
+      ]
+      break
+    case 'double-arrow':
+      vertices = [
+        { x: 0.08, y: 0.5 }, { x: 0.28, y: 0.28 }, { x: 0.28, y: 0.42 },
+        { x: 0.72, y: 0.42 }, { x: 0.72, y: 0.28 }, { x: 0.92, y: 0.5 },
+        { x: 0.72, y: 0.72 }, { x: 0.72, y: 0.58 },
+        { x: 0.28, y: 0.58 }, { x: 0.28, y: 0.72 }
+      ]
+      break
+    default:
+      vertices = [
+        { x: 0.15, y: 0.4 }, { x: 0.55, y: 0.4 }, { x: 0.55, y: 0.2 },
+        { x: 0.85, y: 0.5 },
+        { x: 0.55, y: 0.8 }, { x: 0.55, y: 0.6 }, { x: 0.15, y: 0.6 }
+      ]
+  }
+  return sampleAlongEdges(vertices, n, true)
+}
+
+/**
+ * 曲线类图形（爱心、月牙、水滴、云朵、叶子等）
+ * 通过参数方程生成
+ */
+function generateCurvePoints(config, n) {
+  switch (config.id) {
+    case 'heart':
+      return generateHeartPoints(n)
+    case 'crescent':
+      return generateCrescentPoints(n)
+    case 'waterdrop':
+      return generateWaterdropPoints(n)
+    case 'cloud':
+      return generateCloudPoints(n)
+    case 'leaf':
+      return generateLeafPoints(n)
+    case 'infinity':
+      return generateInfinityPoints(n)
+    case 'taichi':
+      return generateTaichiPoints(n)
+    case 'spiral':
+      return generateSpiralPoints(n)
+    default:
+      return generateCirclePoints(n)
+  }
+}
+
+/**
+ * 爱心曲线（参数方程）
+ */
+function generateHeartPoints(n) {
+  const points = []
+  for (let i = 0; i < n; i++) {
+    const t = (i * 2 * Math.PI) / n
+    // 标准爱心参数方程
+    const x = 16 * Math.sin(t) ** 3
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+    points.push({ x, y })
+  }
+  return normalizeToUnit(points)
+}
+
+/**
+ * 月牙形
+ */
+function generateCrescentPoints(n) {
+  const points = []
+  const cx = 0.5, cy = 0.5, r = 0.38
+  // 外圆弧
+  const outerCount = Math.floor(n * 0.6)
+  for (let i = 0; i < outerCount; i++) {
+    const t = (i * 2 * Math.PI) / outerCount
+    points.push({
+      x: cx + r * Math.cos(t),
+      y: cy + r * Math.sin(t)
+    })
+  }
+  // 内圆弧（偏移）
+  const innerCount = n - outerCount
+  const innerCx = cx + r * 0.5
+  const innerR = r * 0.85
+  for (let i = innerCount - 1; i >= 0; i--) {
+    const t = (i * 2 * Math.PI) / innerCount
+    points.push({
+      x: innerCx + innerR * Math.cos(t),
+      y: cy + innerR * Math.sin(t)
+    })
+  }
+  return points
+}
+
+/**
+ * 水滴形
+ */
+function generateWaterdropPoints(n) {
+  const points = []
+  for (let i = 0; i < n; i++) {
+    const t = (i * 2 * Math.PI) / n - Math.PI / 2
+    // 变形圆：顶部尖，底部圆
+    const r = 0.35 * (1 - 0.3 * Math.sin(t))
+    points.push({
+      x: 0.5 + r * Math.cos(t),
+      y: 0.5 + r * Math.sin(t) * 1.2
+    })
+  }
+  return normalizeToUnit(points)
+}
+
+/**
+ * 云朵形（多圆弧组合）
+ */
+function generateCloudPoints(n) {
+  const points = []
+  // 用多个圆弧的上半部分 + 平底来模拟云
+  const bumps = [
+    { cx: 0.3, cy: 0.5, r: 0.18 },
+    { cx: 0.5, cy: 0.38, r: 0.2 },
+    { cx: 0.7, cy: 0.48, r: 0.17 },
+  ]
+  const perBump = Math.floor(n * 0.75 / bumps.length)
+  for (const b of bumps) {
+    for (let i = 0; i < perBump; i++) {
+      const t = Math.PI + (i * Math.PI) / perBump
+      points.push({
+        x: b.cx + b.r * Math.cos(t),
+        y: b.cy + b.r * Math.sin(t)
+      })
+    }
+  }
+  // 底部平线
+  const bottomCount = n - points.length
+  for (let i = 0; i < bottomCount; i++) {
+    const t = i / (bottomCount - 1)
+    points.push({
+      x: 0.15 + t * 0.7,
+      y: 0.65
+    })
+  }
+  return normalizeToUnit(points)
+}
+
+/**
+ * 叶子形
+ */
+function generateLeafPoints(n) {
+  const points = []
+  for (let i = 0; i < n; i++) {
+    const t = (i * 2 * Math.PI) / n
+    const r = 0.35 * Math.abs(Math.cos(t))
+    const angle = t - Math.PI / 4
+    points.push({
+      x: 0.5 + r * Math.cos(angle),
+      y: 0.5 + r * Math.sin(angle)
+    })
+  }
+  return normalizeToUnit(points)
+}
+
+/**
+ * 无限符号 (∞)
+ */
+function generateInfinityPoints(n) {
+  const points = []
+  for (let i = 0; i < n; i++) {
+    const t = (i * 2 * Math.PI) / n
+    // Lemniscate of Bernoulli 参数方程
+    const denom = 1 + Math.sin(t) ** 2
+    points.push({
+      x: 0.5 + 0.3 * Math.cos(t) / denom,
+      y: 0.5 + 0.2 * Math.sin(t) * Math.cos(t) / denom
+    })
+  }
+  return points
+}
+
+/**
+ * 太极圆
+ */
+function generateTaichiPoints(n) {
+  const points = []
+  const cx = 0.5, cy = 0.5, r = 0.38
+  // 外圆
+  const outerCount = Math.floor(n * 0.6)
+  for (let i = 0; i < outerCount; i++) {
+    const t = (i * 2 * Math.PI) / outerCount
+    points.push({
+      x: cx + r * Math.cos(t),
+      y: cy + r * Math.sin(t)
+    })
+  }
+  // S 曲线
+  const sCount = n - outerCount
+  for (let i = 0; i < sCount; i++) {
+    const t = (i * Math.PI) / sCount
+    points.push({
+      x: cx + (r / 2) * Math.sin(t) * 0.3,
+      y: cy - r / 2 + (r * i) / sCount
+    })
+  }
+  return points
+}
+
+/**
+ * 螺旋
+ */
+function generateSpiralPoints(n) {
+  const points = []
+  const cx = 0.5, cy = 0.5
+  const maxR = 0.38
+  const totalAngle = 4 * Math.PI // 2 圈
+  for (let i = 0; i < n; i++) {
+    const t = (i * totalAngle) / n
+    const r = (i / n) * maxR
+    points.push({
+      x: cx + r * Math.cos(t),
+      y: cy + r * Math.sin(t)
+    })
+  }
+  return points
+}
+
+/**
+ * 符号类图形
+ */
+function generateSymbolPoints(config, n) {
+  switch (config.id) {
+    case 'cross':
+      return generateCrossPoints(n)
+    case 'lightning':
+      return generateLightningPoints(n)
+    default:
+      return generateCrossPoints(n)
+  }
+}
+
+/**
+ * 十字形
+ */
+function generateCrossPoints(n) {
+  const w = 0.2, m = 0.12, cx = 0.5
+  // 十字的 12 个顶点
+  const vertices = [
+    { x: cx - w / 2, y: m }, { x: cx + w / 2, y: m },
+    { x: cx + w / 2, y: cx - w / 2 },
+    { x: 1 - m, y: cx - w / 2 }, { x: 1 - m, y: cx + w / 2 },
+    { x: cx + w / 2, y: cx + w / 2 },
+    { x: cx + w / 2, y: 1 - m }, { x: cx - w / 2, y: 1 - m },
+    { x: cx - w / 2, y: cx + w / 2 },
+    { x: m, y: cx + w / 2 }, { x: m, y: cx - w / 2 },
+    { x: cx - w / 2, y: cx - w / 2 },
+  ]
+  return sampleAlongEdges(vertices, n, true)
+}
+
+/**
+ * 闪电
+ */
+function generateLightningPoints(n) {
+  const vertices = [
+    { x: 0.55, y: 0.08 }, { x: 0.3, y: 0.48 },
+    { x: 0.52, y: 0.48 }, { x: 0.42, y: 0.92 },
+    { x: 0.72, y: 0.45 }, { x: 0.5, y: 0.45 }
+  ]
+  return sampleAlongEdges(vertices, n, true)
+}
+
+/**
+ * 组合图形模板（简化为主要轮廓）
+ */
+function generateCompositePoints(config, n) {
+  switch (config.id) {
+    case 'house':
+      return generateHousePoints(n)
+    case 'cat-face':
+      return generateCatFacePoints(n)
+    case 'flower':
+      return generateFlowerPoints(n)
+    case 'butterfly':
+      return generateButterflyPoints(n)
+    case 'christmas-tree':
+      return generateChristmasTreePoints(n)
+    default:
+      return generateCirclePoints(n)
+  }
+}
+
+/**
+ * 房子形
+ */
+function generateHousePoints(n) {
+  const m = 0.15
+  // 屋顶三角形 + 墙壁矩形
+  const roof = [
+    { x: 0.5, y: m }, { x: 1 - m, y: 0.45 }, { x: m, y: 0.45 }
+  ]
+  const wall = [
+    { x: m + 0.05, y: 0.45 }, { x: m + 0.05 + 0.6, y: 0.45 },
+    { x: m + 0.05 + 0.6, y: 0.87 }, { x: m + 0.05, y: 0.87 }
+  ]
+  const roofPts = sampleAlongEdges(roof, Math.floor(n * 0.45), true)
+  const wallPts = sampleAlongEdges(wall, n - roofPts.length, true)
+  return [...roofPts, ...wallPts]
+}
+
+/**
+ * 猫脸
+ */
+function generateCatFacePoints(n) {
+  const cx = 0.5, cy = 0.55
+  // 脸部椭圆
+  const faceCount = Math.floor(n * 0.6)
+  const points = []
+  for (let i = 0; i < faceCount; i++) {
+    const t = (i * 2 * Math.PI) / faceCount
+    points.push({
+      x: cx + 0.32 * Math.cos(t),
+      y: cy + 0.28 * Math.sin(t)
+    })
+  }
+  // 左耳
+  const earCount = Math.floor((n - faceCount) / 2)
+  const leftEar = [
+    { x: 0.22, y: 0.35 }, { x: 0.28, y: 0.12 }, { x: 0.42, y: 0.3 }
+  ]
+  const rightEar = [
+    { x: 0.78, y: 0.35 }, { x: 0.72, y: 0.12 }, { x: 0.58, y: 0.3 }
+  ]
+  points.push(...sampleAlongEdges(leftEar, earCount, false))
+  points.push(...sampleAlongEdges(rightEar, n - points.length, false))
+  return points
+}
+
+/**
+ * 花朵
+ */
+function generateFlowerPoints(n) {
+  const cx = 0.5, cy = 0.5
+  const petalR = 0.15, dist = 0.18
+  const points = []
+  const perPetal = Math.floor(n * 0.85 / 5)
+  // 5 个花瓣
+  for (let p = 0; p < 5; p++) {
+    const angle = (p * 2 * Math.PI) / 5 - Math.PI / 2
+    const px = cx + dist * Math.cos(angle)
+    const py = cy + dist * Math.sin(angle)
+    for (let i = 0; i < perPetal; i++) {
+      const t = (i * 2 * Math.PI) / perPetal
+      points.push({
+        x: px + petalR * Math.cos(t),
+        y: py + petalR * Math.sin(t)
+      })
+    }
+  }
+  // 花心
+  const centerCount = n - points.length
+  for (let i = 0; i < centerCount; i++) {
+    const t = (i * 2 * Math.PI) / centerCount
+    points.push({
+      x: cx + 0.08 * Math.cos(t),
+      y: cy + 0.08 * Math.sin(t)
+    })
+  }
+  return points
+}
+
+/**
+ * 蝴蝶
+ */
+function generateButterflyPoints(n) {
+  const cx = 0.5, cy = 0.5
+  const points = []
+  const wingCount = Math.floor(n * 0.4)
+  // 左翅膀（椭圆）
+  for (let i = 0; i < wingCount; i++) {
+    const t = (i * 2 * Math.PI) / wingCount
+    const cos30 = Math.cos(-0.3), sin30 = Math.sin(-0.3)
+    const ex = 0.18 * Math.cos(t)
+    const ey = 0.22 * Math.sin(t)
+    points.push({
+      x: (cx - 0.18) + ex * cos30 - ey * sin30,
+      y: (cy - 0.08) + ex * sin30 + ey * cos30
+    })
+  }
+  // 右翅膀
+  for (let i = 0; i < wingCount; i++) {
+    const t = (i * 2 * Math.PI) / wingCount
+    const cos30 = Math.cos(0.3), sin30 = Math.sin(0.3)
+    const ex = 0.18 * Math.cos(t)
+    const ey = 0.22 * Math.sin(t)
+    points.push({
+      x: (cx + 0.18) + ex * cos30 - ey * sin30,
+      y: (cy - 0.08) + ex * sin30 + ey * cos30
+    })
+  }
+  // 身体
+  const bodyCount = n - points.length
+  for (let i = 0; i < bodyCount; i++) {
+    const t = (i * 2 * Math.PI) / bodyCount
+    points.push({
+      x: cx + 0.03 * Math.cos(t),
+      y: cy + 0.2 * Math.sin(t)
+    })
+  }
+  return points
+}
+
+/**
+ * 圣诞树
+ */
+function generateChristmasTreePoints(n) {
+  const cx = 0.5
+  const layers = [
+    { top: 0.08, bottom: 0.38, width: 0.25 },
+    { top: 0.28, bottom: 0.58, width: 0.32 },
+    { top: 0.48, bottom: 0.78, width: 0.4 }
+  ]
+  const points = []
+  const perLayer = Math.floor(n * 0.85 / layers.length)
+  for (const l of layers) {
+    const tri = [
+      { x: cx, y: l.top },
+      { x: cx + l.width, y: l.bottom },
+      { x: cx - l.width, y: l.bottom }
+    ]
+    points.push(...sampleAlongEdges(tri, perLayer, true))
+  }
+  // 树干
+  const trunk = [
+    { x: cx - 0.06, y: 0.78 }, { x: cx + 0.06, y: 0.78 },
+    { x: cx + 0.06, y: 0.92 }, { x: cx - 0.06, y: 0.92 }
+  ]
+  points.push(...sampleAlongEdges(trunk, n - points.length, true))
+  return points
+}
+
+// ========== 模板工具函数 ==========
+
+/**
+ * 沿多边形边均匀采样
+ * @param {Array} vertices - 顶点数组
+ * @param {number} n - 采样点数
+ * @param {boolean} closed - 是否闭合（最后一个顶点连回第一个）
+ */
+function sampleAlongEdges(vertices, n, closed) {
+  if (vertices.length < 2 || n < 2) return vertices
+
+  // 计算每条边的长度
+  const edgeCount = closed ? vertices.length : vertices.length - 1
+  const lengths = []
+  let totalLength = 0
+  for (let i = 0; i < edgeCount; i++) {
+    const v1 = vertices[i]
+    const v2 = vertices[(i + 1) % vertices.length]
+    const len = Math.sqrt((v2.x - v1.x) ** 2 + (v2.y - v1.y) ** 2)
+    lengths.push(len)
+    totalLength += len
+  }
+
+  // 根据边长比例分配采样点
+  const points = []
+  let remaining = n
+  for (let i = 0; i < edgeCount; i++) {
+    const v1 = vertices[i]
+    const v2 = vertices[(i + 1) % vertices.length]
+    const count = i < edgeCount - 1
+      ? Math.max(1, Math.round(n * lengths[i] / totalLength))
+      : remaining
+    remaining -= count
+
+    for (let j = 0; j < count; j++) {
+      const t = j / count
+      points.push({
+        x: v1.x + t * (v2.x - v1.x),
+        y: v1.y + t * (v2.y - v1.y)
+      })
+    }
+  }
+
+  return points.slice(0, n)
+}
+
+/**
+ * 将点集归一化到 [0, 1] 范围
+ */
+function normalizeToUnit(points) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  points.forEach(p => {
+    minX = Math.min(minX, p.x)
+    minY = Math.min(minY, p.y)
+    maxX = Math.max(maxX, p.x)
+    maxY = Math.max(maxY, p.y)
+  })
+
+  const rangeX = maxX - minX || 1
+  const rangeY = maxY - minY || 1
+  const range = Math.max(rangeX, rangeY)
+
+  // 居中归一化
+  const offsetX = (range - rangeX) / 2
+  const offsetY = (range - rangeY) / 2
+  const margin = 0.1 // 留边距
+
+  return points.map(p => ({
+    x: margin + (1 - 2 * margin) * (p.x - minX + offsetX) / range,
+    y: margin + (1 - 2 * margin) * (p.y - minY + offsetY) / range
+  }))
+}

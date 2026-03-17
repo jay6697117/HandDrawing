@@ -241,3 +241,78 @@ export function pathLength(points) {
   }
   return total
 }
+
+// ========== 修正 Hausdorff 距离算法 ==========
+
+/**
+ * 单向平均最小距离：A 中每个点到 B 的最小距离的平均值
+ * avgMinDist(A→B) = (1/|A|) × Σ min(d(a, b)) for all a∈A, b∈B
+ */
+export function avgMinDistance(pointsA, pointsB) {
+  if (pointsA.length === 0 || pointsB.length === 0) return Infinity
+
+  let totalMin = 0
+  for (let i = 0; i < pointsA.length; i++) {
+    let minDist = Infinity
+    for (let j = 0; j < pointsB.length; j++) {
+      const d = distance(pointsA[i], pointsB[j])
+      if (d < minDist) minDist = d
+    }
+    totalMin += minDist
+  }
+  return totalMin / pointsA.length
+}
+
+/**
+ * 修正 Hausdorff 距离 (MHD)
+ * MHD(A, B) = max( avgMinDist(A→B), avgMinDist(B→A) )
+ * 双向计算保证对称性，使用平均值替代最大值对手抖容错
+ */
+export function modifiedHausdorffDistance(pointsA, pointsB) {
+  const ab = avgMinDistance(pointsA, pointsB)
+  const ba = avgMinDistance(pointsB, pointsA)
+  return Math.max(ab, ba)
+}
+
+/**
+ * 旋转对齐：尝试多个旋转角度，找到最佳匹配
+ * 返回最小的 MHD 值
+ * @param {Array} userPoints - 用户绘制的点集（已归一化）
+ * @param {Array} templatePoints - 模板点集（已归一化）
+ * @param {number} steps - 尝试的旋转角度数量（默认 24 = 每 15° 一次）
+ * @returns {number} 最小 MHD 距离值
+ */
+export function rotationalAlignment(userPoints, templatePoints, steps = 24) {
+  // 计算用户点集的质心
+  const userCenter = centroid(userPoints)
+
+  let bestMHD = Infinity
+
+  for (let i = 0; i < steps; i++) {
+    const angle = (i * 2 * Math.PI) / steps
+    // 围绕质心旋转用户点集
+    const rotated = rotatePointsAroundCenter(userPoints, userCenter, angle)
+    const mhd = modifiedHausdorffDistance(rotated, templatePoints)
+    if (mhd < bestMHD) {
+      bestMHD = mhd
+    }
+  }
+
+  return bestMHD
+}
+
+/**
+ * 围绕指定中心点旋转点集
+ */
+function rotatePointsAroundCenter(points, center, angle) {
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  return points.map(p => {
+    const dx = p.x - center.x
+    const dy = p.y - center.y
+    return {
+      x: center.x + dx * cos - dy * sin,
+      y: center.y + dx * sin + dy * cos
+    }
+  })
+}
