@@ -15,28 +15,30 @@ import {
 import { getTemplatePoints } from '../config/shapes'
 
 // ===== 各图形类型的距离阈值（控制宽容度和难度梯度） =====
-// threshold 越大 → 评分越宽松；越小 → 越严格
+// threshold 定义"刚好及格"的 MHD 距离
+// 归一化坐标系 [0,1] 下，手绘 MHD 典型值：
+//   画得好 0.03~0.08，画得一般 0.08~0.15，画得差 0.15~0.30
 const TYPE_THRESHOLDS = {
-  circle: 0.12,      // 圆形相对容易画
-  ellipse: 0.14,
-  line: 0.10,        // 直线最严格
-  polygon: 0.16,     // 多边形中等难度
-  star: 0.22,        // 星形较难，放宽
-  arrow: 0.20,       // 箭头较复杂
-  curve: 0.22,       // 曲线类图形放宽
-  symbol: 0.20,      // 符号类
-  composite: 0.25,   // 组合图形最宽松
+  circle: 0.18,      // 圆形相对容易画
+  ellipse: 0.20,
+  line: 0.15,        // 直线最严格
+  polygon: 0.22,     // 多边形中等难度
+  star: 0.30,        // 星形较难，放宽
+  arrow: 0.28,       // 箭头较复杂
+  curve: 0.30,       // 曲线类图形放宽
+  symbol: 0.28,      // 符号类
+  composite: 0.35,   // 组合图形最宽松
 }
 
 // 边数越多的多边形越难画，额外宽容
 const POLYGON_SIDE_BONUS = {
-  3: 0,       // 三角形不加
-  4: 0.01,    // 四边形稍微放宽
-  5: 0.02,
-  6: 0.03,
-  7: 0.04,
-  8: 0.05,
-  10: 0.06,
+  3: 0,        // 三角形不加
+  4: 0.02,     // 四边形稍微放宽
+  5: 0.04,
+  6: 0.05,
+  7: 0.06,
+  8: 0.07,
+  10: 0.08,
 }
 
 /**
@@ -51,7 +53,7 @@ export function calculateSimilarity(rawPoints, shapeConfig) {
   // 预处理管线：平滑 → 归一化 → 重采样
   const smoothed = smoothPoints(rawPoints, 5)
   const normalized = normalizePoints(smoothed)
-  const userResampled = resamplePoints(normalized, 96)
+  const userResampled = resamplePoints(normalized, 64) // 用 64 个点平衡性能和精度
 
   // 获取标准模板点集
   const templatePoints = getTemplatePoints(shapeConfig.id)
@@ -60,22 +62,29 @@ export function calculateSimilarity(rawPoints, shapeConfig) {
     return 0
   }
 
+  // 模板点也重采样到 64 个点来匹配
+  const templateResampled = resamplePoints(templatePoints, 64)
+
   // 获取该图形类型的距离阈值
-  let threshold = TYPE_THRESHOLDS[shapeConfig.type] || 0.18
+  let threshold = TYPE_THRESHOLDS[shapeConfig.type] || 0.25
 
   // 多边形根据边数额外调整
   if (shapeConfig.type === 'polygon' && shapeConfig.sides) {
-    threshold += POLYGON_SIDE_BONUS[shapeConfig.sides] || 0.03
+    threshold += POLYGON_SIDE_BONUS[shapeConfig.sides] || 0.04
   }
 
   // 计算修正 Hausdorff 距离
-  // 对可能旋转的图形使用旋转对齐（如圆形、正多边形、星形不需要严格方向）
+  // 对可旋转图形使用旋转对齐（圆、正多边形、星形允许任意方向）
   let mhd
   if (needsRotationAlignment(shapeConfig)) {
-    mhd = rotationalAlignment(userResampled, templatePoints, 36)
+    // 旋转对齐使用较少步数以提高性能
+    mhd = rotationalAlignment(userResampled, templateResampled, 24)
   } else {
-    mhd = modifiedHausdorffDistance(userResampled, templatePoints)
+    mhd = modifiedHausdorffDistance(userResampled, templateResampled)
   }
+
+  // 调试：输出 MHD 值（方便后续校准）
+  console.log(`[MHD] ${shapeConfig.id}: mhd=${mhd.toFixed(4)}, threshold=${threshold}`)
 
   // 距离转评分
   const rawScore = distanceToScore(mhd, threshold)
@@ -97,17 +106,30 @@ function needsRotationAlignment(config) {
 
 /**
  * MHD 距离转评分 (0-100)
- * 距离越小分数越高
+ * 使用反比例映射，距离越小分数越高
  */
 function distanceToScore(mhd, threshold) {
   if (mhd <= 0) return 100
-  if (mhd >= threshold) {
-    // 超过阈值后快速衰减，但不会直接归零
-    const overflow = (mhd - threshold) / threshold
-    return Math.max(0, 30 * (1 - overflow))
+
+  // 使用更宽容的评分公式
+  // mhd=0 → 100 分, mhd=threshold*0.5 → ~70 分, mhd=threshold → ~40 分, mhd=threshold*2 → ~10 分
+  const ratio = mhd / threshold
+  if (ratio <= 0.3) {
+    // 画得很好：90-100 分
+    return 100 - ratio * 33
+  } else if (ratio <= 0.7) {
+    // 画得不错：65-90 分
+    return 90 - (ratio - 0.3) * 62.5
+  } else if (ratio <= 1.0) {
+    // 画得一般：40-65 分
+    return 65 - (ratio - 0.7) * 83.3
+  } else if (ratio <= 1.5) {
+    // 画得较差：15-40 分
+    return 40 - (ratio - 1.0) * 50
+  } else {
+    // 画得很差：0-15 分
+    return Math.max(0, 15 - (ratio - 1.5) * 15)
   }
-  // 阈值内：线性映射到 30-100
-  return 30 + 70 * (1 - mhd / threshold)
 }
 
 /**
@@ -119,9 +141,14 @@ function applyScoreCurve(raw) {
   if (raw >= 100) return 100
 
   const x = raw / 100
-  // S 型曲线：低分段提升更多，高分段接近线性
-  const curved = x < 0.3
-    ? x * 1.15                          // 低分段提升
-    : 0.345 + (x - 0.3) * 0.935        // 中高分段接近线性
+  // 温和的 S 型曲线：提升中低分段
+  let curved
+  if (x < 0.2) {
+    curved = x * 1.3                          // 极低分段略提升
+  } else if (x < 0.5) {
+    curved = 0.26 + (x - 0.2) * 1.1          // 中低分段适度提升
+  } else {
+    curved = 0.59 + (x - 0.5) * 0.82         // 高分段略压缩
+  }
   return Math.min(100, Math.max(0, curved * 100))
 }
