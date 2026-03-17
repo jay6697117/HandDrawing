@@ -5,14 +5,14 @@
 
 // ========== 章节配置 ==========
 export const chapters = [
-  { id: 1, name: '基础圆与方', color: '#FF6B6B', passThreshold: 80 },
-  { id: 2, name: '三角家族', color: '#4ECDC4', passThreshold: 75 },
-  { id: 3, name: '四边形进阶', color: '#A78BFA', passThreshold: 70 },
-  { id: 4, name: '多边形挑战', color: '#FFD93D', passThreshold: 65 },
-  { id: 5, name: '星形与箭头', color: '#F093FB', passThreshold: 60 },
-  { id: 6, name: '曲线艺术', color: '#00B09B', passThreshold: 55 },
-  { id: 7, name: '符号与标志', color: '#2193B0', passThreshold: 50 },
-  { id: 8, name: '大师之路', color: '#E65010', passThreshold: 45, isFinal: true }
+  { id: 1, name: '基础圆与方', color: '#FF6B6B', passThreshold: 60 },
+  { id: 2, name: '三角家族', color: '#4ECDC4', passThreshold: 55 },
+  { id: 3, name: '四边形进阶', color: '#A78BFA', passThreshold: 50 },
+  { id: 4, name: '多边形挑战', color: '#FFD93D', passThreshold: 45 },
+  { id: 5, name: '星形与箭头', color: '#F093FB', passThreshold: 40 },
+  { id: 6, name: '曲线艺术', color: '#00B09B', passThreshold: 35 },
+  { id: 7, name: '符号与标志', color: '#2193B0', passThreshold: 30 },
+  { id: 8, name: '大师之路', color: '#E65010', passThreshold: 25, isFinal: true }
 ]
 
 // ========== 图形定义 ==========
