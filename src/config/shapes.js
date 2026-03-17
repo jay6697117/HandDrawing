@@ -933,7 +933,16 @@ function generatePolygonPoints(config, n) {
  */
 function getPolygonVertices(config) {
   const id = config.id
-  // 正多边形
+  // 正方形特殊处理：drawFn 画的是轴对齐正方形，模板点也应该轴对齐
+  // 不能用 generateRegularPolygonVertices(4) 因为那生成的是菱形（旋转 45°）
+  if (id === 'square') {
+    const offset = 0.2, size = 0.6
+    return [
+      { x: offset, y: offset }, { x: offset + size, y: offset },
+      { x: offset + size, y: offset + size }, { x: offset, y: offset + size }
+    ]
+  }
+  // 正多边形（不包括正方形）
   if (config.regular) {
     return generateRegularPolygonVertices(config.sides)
   }

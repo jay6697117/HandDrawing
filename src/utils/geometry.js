@@ -316,3 +316,97 @@ function rotatePointsAroundCenter(points, center, angle) {
     }
   })
 }
+
+// ========== 形状分类辅助函数 ==========
+
+/**
+ * 计算路径中直线段所占比例
+ * 将路径分成若干小段，检查每段的曲率是否接近 0
+ * @param {Array} points - 归一化后的点集
+ * @param {number} segmentSize - 每段包含的点数（默认 5）
+ * @param {number} curvatureThreshold - 曲率阈值，低于此值认为是直线（默认 0.15）
+ * @returns {number} 直线段比例 0~1（1 = 全是直线）
+ */
+export function calculateStraightLineRatio(points, segmentSize = 5, curvatureThreshold = 0.15) {
+  if (points.length < segmentSize + 2) return 0
+
+  let straightSegments = 0
+  let totalSegments = 0
+
+  for (let i = 1; i < points.length - 1; i += Math.max(1, Math.floor(segmentSize / 2))) {
+    // 计算当前点的局部曲率
+    const windowStart = Math.max(0, i - Math.floor(segmentSize / 2))
+    const windowEnd = Math.min(points.length - 1, i + Math.floor(segmentSize / 2))
+
+    if (windowEnd - windowStart < 2) continue
+
+    let localCurvatureSum = 0
+    let count = 0
+
+    for (let j = windowStart + 1; j < windowEnd; j++) {
+      const p0 = points[j - 1]
+      const p1 = points[j]
+      const p2 = points[j + 1]
+
+      const v1 = { x: p1.x - p0.x, y: p1.y - p0.y }
+      const v2 = { x: p2.x - p1.x, y: p2.y - p1.y }
+
+      const cross = v1.x * v2.y - v1.y * v2.x
+      const mag1 = Math.sqrt(v1.x ** 2 + v1.y ** 2)
+      const mag2 = Math.sqrt(v2.x ** 2 + v2.y ** 2)
+
+      if (mag1 > 0 && mag2 > 0) {
+        localCurvatureSum += Math.abs(cross / (mag1 * mag2))
+        count++
+      }
+    }
+
+    if (count > 0) {
+      const avgCurvature = localCurvatureSum / count
+      totalSegments++
+      if (avgCurvature < curvatureThreshold) {
+        straightSegments++
+      }
+    }
+  }
+
+  return totalSegments > 0 ? straightSegments / totalSegments : 0
+}
+
+/**
+ * 计算指定角点处的角度（弧度）
+ * @param {Array} points - 点集
+ * @param {Array} cornerIndices - 角点索引数组
+ * @param {number} neighborDistance - 取角点前后多远的点来计算角度（默认 3）
+ * @returns {Array} 各角点处的角度（弧度，0~π）
+ */
+export function calculateAnglesAtCorners(points, cornerIndices, neighborDistance = 3) {
+  const angles = []
+
+  for (const idx of cornerIndices) {
+    // 取角点前后的点
+    const prevIdx = Math.max(0, idx - neighborDistance)
+    const nextIdx = Math.min(points.length - 1, idx + neighborDistance)
+
+    if (prevIdx === idx || nextIdx === idx) continue
+
+    const p0 = points[prevIdx]
+    const p1 = points[idx]
+    const p2 = points[nextIdx]
+
+    // 计算从 p1 到 p0 和从 p1 到 p2 的向量夹角
+    const v1 = { x: p0.x - p1.x, y: p0.y - p1.y }
+    const v2 = { x: p2.x - p1.x, y: p2.y - p1.y }
+
+    const dot = v1.x * v2.x + v1.y * v2.y
+    const mag1 = Math.sqrt(v1.x ** 2 + v1.y ** 2)
+    const mag2 = Math.sqrt(v2.x ** 2 + v2.y ** 2)
+
+    if (mag1 > 0 && mag2 > 0) {
+      const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)))
+      angles.push(Math.acos(cosAngle))
+    }
+  }
+
+  return angles
+}
