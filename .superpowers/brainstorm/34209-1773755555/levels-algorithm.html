@@ -1,0 +1,110 @@
+<h2>🗺️ 关卡系统 & 图形识别算法（第2部分）</h2>
+<p class="subtitle">关卡如何组织，图形如何识别评分</p>
+
+<!-- 关卡系统 -->
+<div class="section">
+  <h3>📚 关卡章节设计</h3>
+  <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+
+    <div style="background: linear-gradient(135deg, #FF6B6B20, #FFE66D20); border: 2px solid #FF6B6B; border-radius: 16px; padding: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <span style="background: #FF6B6B; color: #fff; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: bold;">第一章</span>
+        <strong>基础图形</strong>
+        <span style="font-size: 12px; color: #999;">— 入门难度，通关门槛 60%</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">⭕ 圆形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">△ 三角形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">□ 正方形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">▭ 长方形</span>
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #4ECDC420, #45B7D120); border: 2px solid #4ECDC4; border-radius: 16px; padding: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <span style="background: #4ECDC4; color: #fff; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: bold;">第二章</span>
+        <strong>进阶图形</strong>
+        <span style="font-size: 12px; color: #999;">— 中等难度，通关门槛 65%</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">◇ 菱形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">⏢ 梯形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">▱ 平行四边形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">🥚 椭圆</span>
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #A78BFA20, #667eea20); border: 2px solid #A78BFA; border-radius: 16px; padding: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <span style="background: #A78BFA; color: #fff; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: bold;">第三章</span>
+        <strong>特殊图形</strong>
+        <span style="font-size: 12px; color: #999;">— 较高难度，通关门槛 70%</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">⭐ 五角星</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">❤️ 爱心</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">➡️ 箭头</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">✝ 十字形</span>
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #FFD93D20, #FF914D20); border: 2px solid #FFD93D; border-radius: 16px; padding: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <span style="background: #FFD93D; color: #333; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: bold;">第四章</span>
+        <strong>高级图形</strong>
+        <span style="font-size: 12px; color: #999;">— 挑战难度，通关门槛 75%</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">⬡ 六边形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">⬠ 五边形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">☽ 月牙形</span>
+        <span style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 14px; font-size: 13px;">💧 水滴形</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 12px; padding: 12px 16px; background: rgba(167, 139, 250, 0.1); border-radius: 10px; font-size: 13px; line-height: 1.6;">
+    <strong>解锁规则：</strong>每章需完成前一章全部关卡（≥通关门槛）后解锁。每个关卡记录历史最高相似度。
+  </div>
+</div>
+
+<!-- 图形识别算法 -->
+<div class="section" style="margin-top: 20px;">
+  <h3>🧮 图形识别算法原理</h3>
+  <div style="background: #f8f9fa; border-radius: 16px; padding: 16px; border: 1px solid #e9ecef;">
+
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <div style="background: #FF6B6B; color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">1</div>
+        <div>
+          <strong>采集笔画点坐标</strong>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #666;">用户在 Canvas 上画图时，记录触摸/鼠标轨迹的所有坐标点</p>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <div style="background: #4ECDC4; color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">2</div>
+        <div>
+          <strong>预处理：归一化 + 平滑</strong>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #666;">将坐标归一化到统一尺寸，消除位置和大小差异；平滑去除手抖噪点</p>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <div style="background: #A78BFA; color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">3</div>
+        <div>
+          <strong>提取几何特征</strong>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #666;">分析：顶点数量、内角角度、边长比例、曲率变化、是否闭合、对称性等</p>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <div style="background: #FFD93D; color: #333; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">4</div>
+        <div>
+          <strong>与标准图形对比计算相似度</strong>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #666;">将用户图形与目标标准图形的关键特征逐项对比，加权计算最终相似度百分比</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

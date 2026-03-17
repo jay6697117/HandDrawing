@@ -1,0 +1,99 @@
+<h2>🏗️ 三种游戏架构方案对比</h2>
+<p class="subtitle">根据你的需求，我准备了三种方案，点击选择你偏好的方向</p>
+
+<div class="cards">
+  <!-- 方案A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; color: white;">
+      <div style="text-align: center; margin-bottom: 12px;">
+        <div style="font-size: 36px;">🎯</div>
+        <div style="font-size: 14px; opacity: 0.8; margin-top: 4px;">推荐方案</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          📱 首页 → 🗺️ 关卡地图 → 🎨 画图界面 → 📊 结果页
+        </div>
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          Vue Router 页面导航 | Pinia 状态管理
+        </div>
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          图形识别：几何特征算法（点数/角度/对称性）
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 多页面 SPA + 几何特征识别</h3>
+      <p><strong>架构：</strong>Vue Router 管理页面切换（首页/关卡地图/画图/结果），Pinia 管理全局状态</p>
+      <p><strong>图形识别：</strong>分析用户笔画的几何特征（顶点数、角度、曲率、对称性），匹配最接近的标准图形</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>结构清晰，易于扩展</li><li>识别算法可控，精度高</li><li>页面间导航流畅</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>代码量稍多</li><li>需要手写识别算法</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 方案B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: linear-gradient(135deg, #f093fb, #f5576c); padding: 20px; color: white;">
+      <div style="text-align: center; margin-bottom: 12px;">
+        <div style="font-size: 36px;">⚡</div>
+        <div style="font-size: 14px; opacity: 0.8; margin-top: 4px;">快速方案</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          单页面 + 组件切换（v-if / v-show）
+        </div>
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          Vue 3 reactive 状态 | 无需 Router/Pinia
+        </div>
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          图形识别：轮廓匹配算法（像素对比）
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 单页面组件切换 + 轮廓匹配</h3>
+      <p><strong>架构：</strong>单个页面内通过 v-if 切换不同状态（首页/选关/画图/结果），不引入 Router</p>
+      <p><strong>图形识别：</strong>将用户画的图和标准图形都转为像素图，计算重叠面积百分比</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>开发速度快</li><li>依赖少，项目简单</li><li>识别算法直观</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>功能多了难维护</li><li>像素对比受大小/位置影响大</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 方案C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: linear-gradient(135deg, #4facfe, #00f2fe); padding: 20px; color: white;">
+      <div style="text-align: center; margin-bottom: 12px;">
+        <div style="font-size: 36px;">🧠</div>
+        <div style="font-size: 14px; opacity: 0.8; margin-top: 4px;">高级方案</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          多页面 SPA + 组件化设计
+        </div>
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          Vue Router + Pinia + 插件化图形系统
+        </div>
+        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px;">
+          图形识别：Hausdorff 距离 + 几何特征混合
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 完整 SPA + 混合识别算法</h3>
+      <p><strong>架构：</strong>与 A 类似但更模块化，图形系统做成可插拔插件，每种图形独立定义识别规则</p>
+      <p><strong>图形识别：</strong>结合 Hausdorff 距离（形状轮廓相似度）+ 几何特征（角度、比例），双重验证更精准</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>识别最精准</li><li>扩展性极强</li><li>代码质量高</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>开发时间最长</li><li>复杂度较高</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px; padding: 16px; background: rgba(102, 126, 234, 0.1); border-radius: 12px; border: 1px solid rgba(102, 126, 234, 0.2);">
+  <h3>💡 我的推荐：方案 A</h3>
+  <p>在结构清晰和开发效率之间取得最佳平衡。几何特征识别算法对规则图形（圆、三角、矩形等）效果很好，而 Vue Router + Pinia 的架构让后续加排行榜、后端接入都很方便。</p>
+</div>
