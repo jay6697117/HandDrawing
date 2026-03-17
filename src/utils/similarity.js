@@ -1,7 +1,7 @@
 /**
- * 相似度算法 v4.0（MHD + 几何特征惩罚版）
- * 在 MHD 距离基础上增加几何特征验证
- * 防止形状差异大的图形获得虚高分数
+ * 相似度算法 v5.0（MHD + 几何特征惩罚版）
+ * 经过全量测试校准的评分系统
+ * 目标：认真画的能通关，随便画的过不了
  */
 
 import {
@@ -17,31 +17,31 @@ import {
 } from './geometry'
 import { getTemplatePoints } from '../config/shapes'
 
-// ===== 各图形类型的距离阈值（控制宽容度和难度梯度） =====
-// threshold 定义"刚好及格"的 MHD 距离
-// 归一化坐标系 [0,1] 下，手绘 MHD 典型值：
-//   画得好 0.03~0.08，画得一般 0.08~0.15，画得差 0.15~0.30
+// ===== 各图形类型的距离阈值 =====
+// 经过全量测试校准：
+//   手绘好 MHD 约 0.03~0.08，一般 0.08~0.15，差 0.15~0.30
+// 阈值设置原则：认真画（noise=5px）的 ratio 应在 0.3~0.6 区间
 const TYPE_THRESHOLDS = {
-  circle: 0.12,      // 圆形
-  ellipse: 0.14,     // 椭圆
-  line: 0.10,        // 直线最严格
-  polygon: 0.15,     // 多边形收紧
-  star: 0.22,        // 星形较难
-  arrow: 0.20,       // 箭头
-  curve: 0.22,       // 曲线类
-  symbol: 0.20,      // 符号类
-  composite: 0.28,   // 组合图形
+  circle: 0.18,      // 圆形（手绘 MHD ~0.10）
+  ellipse: 0.16,     // 椭圆
+  line: 0.12,        // 直线
+  polygon: 0.25,     // 多边形（手绘 MHD ~0.10~0.19，需要宽松）
+  star: 0.18,        // 星形
+  arrow: 0.16,       // 箭头
+  curve: 0.16,       // 曲线类（之前太宽松）
+  symbol: 0.14,      // 符号类
+  composite: 0.18,   // 组合图形（之前太宽松）
 }
 
-// 边数越多的多边形越难画，给予少量宽容
+// 边数越多的多边形越难画，给予适度宽容
 const POLYGON_SIDE_BONUS = {
   3: 0,        // 三角形不加
-  4: 0.01,     // 四边形微量放宽
-  5: 0.02,
-  6: 0.03,
-  7: 0.04,
-  8: 0.05,
-  10: 0.06,
+  4: 0.02,     // 四边形适度放宽
+  5: 0.03,
+  6: 0.04,
+  7: 0.05,
+  8: 0.06,
+  10: 0.07,
 }
 
 /**
@@ -80,7 +80,6 @@ export function calculateSimilarity(rawPoints, shapeConfig) {
   // 对可旋转图形使用旋转对齐（圆、星形、5边及以上正多边形允许任意方向）
   let mhd
   if (needsRotationAlignment(shapeConfig)) {
-    // 旋转对齐使用较少步数以提高性能
     mhd = rotationalAlignment(userResampled, templateResampled, 24)
   } else {
     mhd = modifiedHausdorffDistance(userResampled, templateResampled)
@@ -102,7 +101,7 @@ export function calculateSimilarity(rawPoints, shapeConfig) {
 
 /**
  * 判断图形是否需要旋转对齐
- * 对称图形（圆、正多边形、星形）允许任意方向绘制
+ * 对称图形允许任意方向绘制
  */
 function needsRotationAlignment(config) {
   if (config.type === 'circle' || config.type === 'ellipse') return true
@@ -114,25 +113,24 @@ function needsRotationAlignment(config) {
 
 /**
  * MHD 距离转评分 (0-100)
- * 使用反比例映射，距离越小分数越高
+ * 经过校准的评分曲线
  */
 function distanceToScore(mhd, threshold) {
   if (mhd <= 0) return 100
 
-  // 评分梯度更陡峭，差的图形扣分更多
   const ratio = mhd / threshold
-  if (ratio <= 0.25) {
+  if (ratio <= 0.3) {
     // 画得非常好：85-100 分
-    return 100 - ratio * 60
-  } else if (ratio <= 0.5) {
+    return 100 - ratio * 50
+  } else if (ratio <= 0.6) {
     // 画得不错：55-85 分
-    return 85 - (ratio - 0.25) * 120
+    return 85 - (ratio - 0.3) * 100
   } else if (ratio <= 1.0) {
-    // 画得一般：20-55 分
-    return 55 - (ratio - 0.5) * 70
+    // 画得一般：25-55 分
+    return 55 - (ratio - 0.6) * 75
   } else if (ratio <= 1.5) {
-    // 画得较差：5-20 分
-    return 20 - (ratio - 1.0) * 30
+    // 画得较差：5-25 分
+    return 25 - (ratio - 1.0) * 40
   } else {
     // 画得很差：0-5 分
     return Math.max(0, 5 - (ratio - 1.5) * 10)
@@ -141,19 +139,18 @@ function distanceToScore(mhd, threshold) {
 
 /**
  * 评分曲线调整
- * 让努力画的用户不会因为手抖等原因得到过低分数
+ * 温和的线性映射，不再有大幅提升或压缩
  */
 function applyScoreCurve(raw) {
   if (raw <= 0) return 0
   if (raw >= 100) return 100
 
   const x = raw / 100
-  // 温和曲线：不再过度提升中低分段
   let curved
   if (x < 0.3) {
-    curved = x * 0.9                             // 低分段不再提升
+    curved = x * 0.9                             // 低分段不提升
   } else if (x < 0.6) {
-    curved = 0.27 + (x - 0.3) * 1.0              // 中段线性映射
+    curved = 0.27 + (x - 0.3) * 1.0              // 中段线性
   } else {
     curved = 0.57 + (x - 0.6) * 1.075            // 高分段正常
   }
@@ -164,9 +161,8 @@ function applyScoreCurve(raw) {
 
 /**
  * 计算几何特征惩罚系数
- * 返回 0~1 的惩罚因子（1.0 = 不惩罚，越小扣分越多）
- * @param {Array} points - 归一化后的用户绘制点
- * @param {Object} config - 图形配置
+ * 返回 0.5~1.0 的惩罚因子（1.0 = 不惩罚）
+ * 惩罚较温和，主要用于区分"完全不像"的极端情况
  */
 function calculateGeometricPenalty(points, config) {
   if (!points || points.length < 10) return 1.0
@@ -179,55 +175,47 @@ function calculateGeometricPenalty(points, config) {
     case 'line':
       return linePenalty(points)
     default:
-      return 1.0 // 其他类型暂不惩罚
+      return 1.0 // 曲线/符号/组合类不惩罚（靠 MHD 阈值控制）
   }
 }
 
 /**
  * 多边形几何特征惩罚
- * 检查角点数、边长比、角度、宽高比、闭合性
+ * 只惩罚极端偏差，容忍手绘的自然误差
  */
 function polygonPenalty(points, config) {
   const expectedSides = config.sides || 4
   let penalty = 1.0
 
   // 1. 闭合性检查（多边形应该是闭合的）
-  const closed = isClosedShape(points, 0.15)
+  const closed = isClosedShape(points, 0.2) // 放宽闭合阈值
   if (!closed) {
-    penalty *= 0.7 // 不闭合扣 30%
+    penalty *= 0.8 // 不闭合轻微扣分
   }
 
-  // 2. 角点数检查
+  // 2. 角点数检查（放宽容差）
   const corners = findCorners(points, 0.4)
-  const cornerCount = corners.length
-  const cornerDiff = Math.abs(cornerCount - expectedSides)
-  if (cornerDiff === 0) {
-    // 角点数完全匹配，不惩罚
-  } else if (cornerDiff === 1) {
-    penalty *= 0.9 // 差 1 个角，轻微惩罚
+  const cornerDiff = Math.abs(corners.length - expectedSides)
+  if (cornerDiff <= 1) {
+    // 差 0~1 个角不惩罚，手绘很正常
   } else if (cornerDiff === 2) {
-    penalty *= 0.75 // 差 2 个角，中等惩罚
-  } else {
-    penalty *= 0.6 // 差太多，严重惩罚
+    penalty *= 0.9
+  } else if (cornerDiff >= 3) {
+    penalty *= 0.8
   }
 
-  // 3. 针对正方形的额外检查
+  // 3. 针对正方形的额外检查（只检查极端情况）
   if (config.id === 'square' || (config.regular && expectedSides === 4)) {
-    penalty *= squareSpecificPenalty(points, corners)
+    penalty *= squareSpecificPenalty(points)
   }
 
-  // 4. 针对长方形的宽高比检查
-  if (config.id === 'rectangle') {
-    penalty *= rectanglePenalty(points)
-  }
-
-  return Math.max(0.3, penalty) // 最低不低于 0.3
+  return Math.max(0.5, penalty) // 最低不低于 0.5，防止惩罚雪崩
 }
 
 /**
- * 正方形专用惩罚：检查宽高比和角度
+ * 正方形专用惩罚：只检查宽高比的极端偏差
  */
-function squareSpecificPenalty(points, corners) {
+function squareSpecificPenalty(points) {
   let penalty = 1.0
 
   // 计算包围盒的宽高比
@@ -242,140 +230,52 @@ function squareSpecificPenalty(points, corners) {
   const height = maxY - minY
   if (width > 0 && height > 0) {
     const aspectRatio = Math.min(width, height) / Math.max(width, height)
-    // 正方形宽高比应接近 1.0
-    if (aspectRatio < 0.6) {
-      penalty *= 0.6 // 太扁或太窄，严重惩罚
-    } else if (aspectRatio < 0.75) {
-      penalty *= 0.75
-    } else if (aspectRatio < 0.85) {
-      penalty *= 0.9
+    // 只惩罚极端不像正方形的情况
+    if (aspectRatio < 0.45) {
+      penalty *= 0.7 // 宽高比太极端
+    } else if (aspectRatio < 0.6) {
+      penalty *= 0.85
     }
-  }
-
-  // 检查角度：如果有足够的角点，验证角度是否接近 90°
-  if (corners.length >= 3) {
-    let totalAngleError = 0
-    let angleCount = 0
-    for (let i = 0; i < corners.length && i < 6; i++) {
-      const idx = corners[i]
-      // 取角点前后的点来计算角度
-      const prevIdx = Math.max(0, idx - Math.floor(points.length * 0.08))
-      const nextIdx = Math.min(points.length - 1, idx + Math.floor(points.length * 0.08))
-      if (prevIdx !== idx && nextIdx !== idx) {
-        const v1 = { x: points[prevIdx].x - points[idx].x, y: points[prevIdx].y - points[idx].y }
-        const v2 = { x: points[nextIdx].x - points[idx].x, y: points[nextIdx].y - points[idx].y }
-        const dot = v1.x * v2.x + v1.y * v2.y
-        const mag1 = Math.sqrt(v1.x ** 2 + v1.y ** 2)
-        const mag2 = Math.sqrt(v2.x ** 2 + v2.y ** 2)
-        if (mag1 > 0 && mag2 > 0) {
-          const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)))
-          const angle = Math.acos(cosAngle) * 180 / Math.PI
-          // 正方形角度应接近 90°
-          totalAngleError += Math.abs(angle - 90)
-          angleCount++
-        }
-      }
-    }
-    if (angleCount > 0) {
-      const avgAngleError = totalAngleError / angleCount
-      if (avgAngleError > 35) {
-        penalty *= 0.6 // 角度偏差太大
-      } else if (avgAngleError > 25) {
-        penalty *= 0.75
-      } else if (avgAngleError > 15) {
-        penalty *= 0.9
-      }
-    }
-  }
-
-  // 检查边的直线度：正方形的边应该是直的
-  if (corners.length >= 3) {
-    let totalStraightness = 0
-    let segCount = 0
-    for (let i = 0; i < corners.length - 1; i++) {
-      const startIdx = corners[i]
-      const endIdx = corners[i + 1]
-      if (endIdx - startIdx > 3) {
-        const straightness = calculateEdgeStraightness(points, startIdx, endIdx)
-        totalStraightness += straightness
-        segCount++
-      }
-    }
-    if (segCount > 0) {
-      const avgStraightness = totalStraightness / segCount
-      // avgStraightness 接近 1.0 表示很直，越小越弯
-      if (avgStraightness < 0.85) {
-        penalty *= 0.7
-      } else if (avgStraightness < 0.92) {
-        penalty *= 0.85
-      }
-    }
+    // 0.6 以上不惩罚，手绘正方形宽高比 0.6~1.0 都算正常
   }
 
   return penalty
 }
 
 /**
- * 长方形惩罚：检查宽高比不能太接近正方形也不能太极端
- */
-function rectanglePenalty(points) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  points.forEach(p => {
-    minX = Math.min(minX, p.x)
-    minY = Math.min(minY, p.y)
-    maxX = Math.max(maxX, p.x)
-    maxY = Math.max(maxY, p.y)
-  })
-  const width = maxX - minX
-  const height = maxY - minY
-  if (width <= 0 || height <= 0) return 1.0
-
-  const aspectRatio = Math.min(width, height) / Math.max(width, height)
-  // 长方形宽高比应该在 0.4~0.85 之间
-  if (aspectRatio > 0.9) {
-    return 0.85 // 太接近正方形
-  }
-  if (aspectRatio < 0.3) {
-    return 0.8 // 太极端
-  }
-  return 1.0
-}
-
-/**
  * 圆形几何特征惩罚
- * 检查圆度和曲率一致性
+ * 只检查圆度的极端偏差
  */
 function circlePenalty(points) {
   let penalty = 1.0
 
   // 闭合性检查
-  if (!isClosedShape(points, 0.15)) {
-    penalty *= 0.7
+  if (!isClosedShape(points, 0.2)) {
+    penalty *= 0.8
   }
 
-  // 圆度检查：计算各点到质心的距离方差
+  // 圆度检查：最大最小半径之比
   const center = centroid(points)
   const distances = points.map(p => distance(p, center))
   const avgDist = distances.reduce((a, b) => a + b, 0) / distances.length
   if (avgDist > 0) {
     const maxDist = Math.max(...distances)
     const minDist = Math.min(...distances)
-    const roundness = minDist / maxDist // 1.0 = 完美圆
-    if (roundness < 0.5) {
-      penalty *= 0.6
-    } else if (roundness < 0.7) {
-      penalty *= 0.8
-    } else if (roundness < 0.85) {
-      penalty *= 0.9
+    const roundness = minDist / maxDist
+    // 只惩罚极端不圆的情况
+    if (roundness < 0.4) {
+      penalty *= 0.7
+    } else if (roundness < 0.6) {
+      penalty *= 0.85
     }
   }
 
-  return Math.max(0.3, penalty)
+  return Math.max(0.5, penalty)
 }
 
 /**
  * 直线几何特征惩罚
- * 检查路径偏离直线的程度
+ * 检测路径偏离直线的程度
  */
 function linePenalty(points) {
   if (points.length < 3) return 1.0
@@ -388,7 +288,6 @@ function linePenalty(points) {
   // 计算各点到首尾连线的平均距离
   let totalDev = 0
   for (const p of points) {
-    // 点到直线距离公式
     const dx = last.x - first.x
     const dy = last.y - first.y
     const dev = Math.abs(dx * (first.y - p.y) - (first.x - p.x) * dy) / lineLen
@@ -397,31 +296,7 @@ function linePenalty(points) {
   const avgDev = totalDev / points.length
   const devRatio = avgDev / lineLen
 
-  if (devRatio > 0.15) return 0.6
-  if (devRatio > 0.08) return 0.8
-  if (devRatio > 0.04) return 0.9
+  if (devRatio > 0.2) return 0.6
+  if (devRatio > 0.1) return 0.8
   return 1.0
-}
-
-/**
- * 计算一段边的直线度
- * 返回 0~1（1.0 = 完全直线）
- */
-function calculateEdgeStraightness(points, startIdx, endIdx) {
-  const start = points[startIdx]
-  const end = points[endIdx]
-  const edgeLen = distance(start, end)
-  if (edgeLen <= 0) return 1.0
-
-  let maxDev = 0
-  for (let i = startIdx + 1; i < endIdx; i++) {
-    const p = points[i]
-    const dx = end.x - start.x
-    const dy = end.y - start.y
-    const dev = Math.abs(dx * (start.y - p.y) - (start.x - p.x) * dy) / edgeLen
-    maxDev = Math.max(maxDev, dev)
-  }
-
-  // 用最大偏差与边长的比值衡量直线度
-  return Math.max(0, 1 - maxDev / edgeLen * 5)
 }
